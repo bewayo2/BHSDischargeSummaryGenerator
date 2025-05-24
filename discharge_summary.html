@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discharge Summary Generator</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f7f9fa;
+      margin: 0;
+      padding: 0;
+    }
+    .container {
+      max-width: 700px;
+      margin: 40px auto;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.07);
+      padding: 32px 24px 24px 24px;
+    }
+    h1 {
+      text-align: center;
+      color: #2a3b4c;
+      margin-bottom: 8px;
+    }
+    .desc {
+      color: #4a5a6a;
+      font-size: 1rem;
+      margin-bottom: 24px;
+      text-align: center;
+    }
+    textarea {
+      width: 100%;
+      min-height: 160px;
+      font-size: 1rem;
+      padding: 12px;
+      border-radius: 6px;
+      border: 1px solid #cfd8dc;
+      margin-bottom: 16px;
+      resize: vertical;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 16px;
+      border-radius: 6px;
+      border: 1px solid #cfd8dc;
+      font-size: 1rem;
+    }
+    button {
+      background: #1976d2;
+      color: #fff;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-bottom: 16px;
+    }
+    button:disabled {
+      background: #b0bec5;
+      cursor: not-allowed;
+    }
+    .summary {
+      margin-top: 32px;
+      background: #f1f8e9;
+      border-radius: 8px;
+      padding: 20px;
+      border: 1px solid #c5e1a5;
+    }
+    .summary h2 {
+      color: #33691e;
+      margin-top: 0;
+    }
+    .section {
+      margin-bottom: 18px;
+    }
+    .section h3 {
+      margin-bottom: 4px;
+      color: #1976d2;
+      font-size: 1.08rem;
+    }
+    .section p {
+      margin: 0;
+      color: #263238;
+    }
+    .note {
+      font-size: 0.95rem;
+      color: #b71c1c;
+      margin-bottom: 12px;
+    }
+    .footer {
+      text-align: center;
+      color: #90a4ae;
+      font-size: 0.95rem;
+      margin-top: 40px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>BHS Discharge Summary Demo</h1>
+    <div class="desc">
+      Paste clinical notes below. The app will generate a structured discharge summary using only the information you provide.<br>
+      <b>No information will be invented or hallucinated.</b>
+    </div>
+    
+    <textarea id="clinicalNotes" placeholder="Paste clinical notes here..."></textarea>
+    <button id="generateBtn">Generate Discharge Summary</button>
+    <div id="loading" style="display:none; color:#1976d2; margin-bottom:12px;">Generating summary...</div>
+    <div id="summary" class="summary" style="display:none;"></div>
+  </div>
+  <div class="footer">
+    &copy; 2024 Discharge Summary Demo. Powered by OpenAI GPT-4.1 API.
+  </div>
+  <script type="module">
+    import { GPT_API_KEY } from './gpt_api_key.js';
+
+    // Standard discharge summary headings
+    const headings = [
+      'Reason for hospitalisation',
+      'Significant findings & final diagnoses',
+      'Procedures / treatments',
+      'Hospital course (brief narrative)',
+      'Current condition at discharge',
+      'Medication list with changes explained',
+      'Follow-up tests/appointments',
+      'Patient & family instructions (plain language)',
+      'Responsible clinician contact + signature'
+    ];
+
+    // Standards-aligned prompts for each section
+    const sectionPrompts = {
+      'Reason for hospitalisation':
+        'Extract and summarize the reason for hospitalisation from the following clinical notes. Only use information present in the text. Do not invent or add information.',
+      'Significant findings & final diagnoses':
+        'Extract and summarize the significant findings and final diagnoses from the following clinical notes. Only use information present in the text. Do not invent or add information.',
+      'Procedures / treatments':
+        'Extract and summarize all procedures and treatments performed during the hospital stay from the following clinical notes. Only use information present in the text. Do not invent or add information.',
+      'Hospital course (brief narrative)':
+        'Extract and summarize the hospital course, including key events and clinical thinking, from the following clinical notes. Only use information present in the text. Do not invent or add information.',
+      'Current condition at discharge':
+        'Extract and summarize the patient\'s current condition at discharge from the following clinical notes. Only use information present in the text. Do not invent or add information.',
+      'Medication list with changes explained':
+        'Extract and summarize the medication list at discharge, including any changes and explanations, from the following clinical notes. Only use information present in the text. Do not invent or add information.',
+      'Follow-up tests/appointments':
+        'Extract and summarize all follow-up tests and appointments, including pending investigations and who will follow up, from the following clinical notes. Only use information present in the text. Do not invent or add information.',
+      'Patient & family instructions (plain language)':
+        'Extract and summarize, in plain language, any instructions for the patient and family that are present in the following clinical notes. Only use information present in the text. Do not invent or add information.',
+      'Responsible clinician contact + signature':
+        'Extract and summarize the responsible clinician\'s contact information and signature from the following clinical notes. Only use information present in the text. Do not invent or add information.'
+    };
+
+    const model = 'google/flan-t5-large'; // Instruction-tuned model
+    const endpoint = `https://api-inference.huggingface.co/models/${model}`;
+
+    function splitBySections(text) {
+      // Try to split the input into sections based on headings or common section markers
+      // If not found, treat the whole text as one block
+      // This is a simple heuristic; for more advanced, use NLP section splitter
+      const sectionRegex = /([A-Z][A-Za-z\s\/\-&]+):/g;
+      let match, lastIndex = 0, sections = [];
+      let indices = [];
+      while ((match = sectionRegex.exec(text)) !== null) {
+        indices.push({
+          heading: match[1].trim(),
+          index: match.index
+        });
+      }
+      if (indices.length === 0) {
+        return [{ heading: 'Notes', content: text.trim() }];
+      }
+      for (let i = 0; i < indices.length; i++) {
+        const start = indices[i].index + indices[i].heading.length + 1;
+        const end = (i + 1 < indices.length) ? indices[i + 1].index : text.length;
+        sections.push({
+          heading: indices[i].heading,
+          content: text.slice(start, end).trim()
+        });
+      }
+      return sections;
+    }
+
+    // Helper to escape regex special characters
+    function escapeRegExp(string) {
+      return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    // Clean and format the model's output for each section
+    function cleanSummary(sectionHeading, summary) {
+      // Escape the heading for regex
+      const escapedHeading = escapeRegExp(sectionHeading);
+      // Allow for minor variations (spaces, punctuation) between words
+      const flexibleHeading = escapedHeading.replace(/\\s\+/g, '\\s+').replace(/\\-/g, '[\\-\\s]?');
+      const headingPattern = new RegExp('^\s*' + flexibleHeading + '[:\s-]*', 'i');
+      let cleaned = summary.replace(headingPattern, '');
+      cleaned = cleaned.replace(/\*/g, '');
+      cleaned = cleaned.replace(/^[\s\-\*]+/gm, '');
+      cleaned = cleaned.replace(/\n{2,}/g, '\n');
+      return cleaned.trim();
+    }
+
+    // Format the summary for better readability
+    function formatSummary(text) {
+      // Add paragraph breaks at logical places
+      let formatted = text
+        .replace(/(On the \w+ day,|At discharge,|Medications at discharge|The patient was instructed|Follow-up|The responsible clinician)/g, '\n\n$1')
+        .replace(/\n{2,}/g, '\n\n');
+
+      // Convert lines starting with - or • into <ul><li>...</li></ul>
+      if (formatted.match(/^[\s\-•]+/m)) {
+        formatted = formatted.replace(/(?:^|\n)[\s\-•]+(.+)/g, '<li>$1</li>');
+        formatted = '<ul>' + formatted + '</ul>';
+      }
+
+      // Convert double newlines to <p>
+      formatted = formatted.split(/\n{2,}/).map(p => p.trim() ? `<p>${p.trim()}</p>` : '').join('');
+
+      // Remove any leftover single newlines
+      formatted = formatted.replace(/\n/g, ' ');
+
+      return formatted;
+    }
+
+    async function summarize(prompt) {
+      // Call OpenAI GPT-4.1 API for summarization
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GPT_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'gpt-4-1106-preview',
+          messages: [
+            { role: 'system', content: 'You are a clinical discharge summary assistant. For each section, extract and summarize only what is present in the provided clinical notes. Never invent or add information. Do not repeat the section heading in your response. Do not use Markdown formatting (no asterisks, no bold, no lists with dashes or asterisks). Use clear, concise, and professional language. Format your response with clear paragraphs and use bullet points for lists such as medications, instructions, and follow-up items. Do not use Markdown.' },
+            { role: 'user', content: prompt }
+          ],
+          max_tokens: 512,
+          temperature: 0.2
+        })
+      });
+      if (!response.ok) {
+        throw new Error('API error: ' + response.statusText);
+      }
+      const data = await response.json();
+      if (data.choices && data.choices[0]?.message?.content) {
+        return data.choices[0].message.content.trim();
+      }
+      throw new Error('Unexpected API response');
+    }
+
+    document.getElementById('generateBtn').onclick = async function() {
+      const notes = document.getElementById('clinicalNotes').value.trim();
+      const summaryDiv = document.getElementById('summary');
+      const loadingDiv = document.getElementById('loading');
+      summaryDiv.style.display = 'none';
+      summaryDiv.innerHTML = '';
+      if (!notes) {
+        alert('Please paste clinical notes.');
+        return;
+      }
+      loadingDiv.style.display = 'block';
+      this.disabled = true;
+      try {
+        let summarySections = [];
+        for (const heading of headings) {
+          if (notes) {
+            let prompt = notes;
+            if (sectionPrompts[heading]) {
+              prompt = sectionPrompts[heading] + "\n\n" + notes;
+            }
+            // Summarize this section using GPT-4.1
+            const rawSummary = await summarize(prompt);
+            const summary = formatSummary(cleanSummary(heading, rawSummary));
+            summarySections.push({ heading, summary });
+          } else {
+            summarySections.push({ heading, summary: '<i>No information provided.</i>' });
+          }
+        }
+        // Display summary
+        summaryDiv.innerHTML = '<h2>Discharge Summary</h2>' + summarySections.map(s => `
+          <div class="section">
+            <h3>${s.heading}</h3>
+            <p>${s.summary}</p>
+          </div>
+        `).join('');
+        summaryDiv.style.display = 'block';
+      } catch (err) {
+        summaryDiv.innerHTML = `<span style="color:#b71c1c;">Error: ${err.message}</span>`;
+        summaryDiv.style.display = 'block';
+      } finally {
+        loadingDiv.style.display = 'none';
+        this.disabled = false;
+      }
+    };
+  </script>
+</body>
+</html> 
