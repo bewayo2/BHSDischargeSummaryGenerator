@@ -109,9 +109,14 @@
     </div>
     
     <textarea id="clinicalNotes" placeholder="Paste clinical notes here..."></textarea>
-    <button id="generateBtn">Generate Discharge Summary</button>
+    <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+      <button id="generateBtn">Generate Discharge Summary</button>
+      <button id="generateCodesBtn" style="background: #388e3c;">Generate CPT/ICD Codes</button>
+    </div>
     <div id="loading" style="display:none; color:#1976d2; margin-bottom:12px;">Generating summary...</div>
+    <div id="loadingCodes" style="display:none; color:#388e3c; margin-bottom:12px;">Generating codes...</div>
     <div id="summary" class="summary" style="display:none;"></div>
+    <div id="codes" class="summary" style="display:none; background: #e8f5e8; border: 1px solid #a5d6a7;"></div>
   </div>
   <div class="footer">
     &copy; 2024 Discharge Summary Demo. Powered by OpenAI GPT-4.1 API.
@@ -261,6 +266,57 @@
       throw new Error('Unexpected API response');
     }
 
+    async function generateCodes(clinicalNotes) {
+      // Call OpenAI GPT-4.1 API for CPT/ICD code generation
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${GPT_API_KEY}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'gpt-4-1106-preview',
+          messages: [
+            { 
+              role: 'system', 
+              content: `You are a medical coding specialist. Based on the provided clinical notes, generate appropriate CPT (Current Procedural Terminology) and ICD-10 (International Classification of Diseases) codes that would be relevant for billing and documentation purposes.
+
+For each code, provide:
+1. The code number
+2. A brief description of what the code represents
+3. Why it applies to this patient's case
+
+Format your response as follows:
+
+CPT CODES:
+• [CPT Code] - [Description] - [Reason for this code]
+
+ICD-10 CODES:
+• [ICD-10 Code] - [Description] - [Reason for this code]
+
+Only include codes that are directly supported by the information in the clinical notes. Do not invent or assume procedures or diagnoses that are not documented. If no specific procedures or diagnoses are mentioned, indicate that no codes can be generated from the provided information.
+
+Use the most specific and appropriate codes based on the documented clinical information.` 
+            },
+            { 
+              role: 'user', 
+              content: `Please analyze the following clinical notes and generate appropriate CPT and ICD-10 codes:\n\n${clinicalNotes}` 
+            }
+          ],
+          max_tokens: 800,
+          temperature: 0.1
+        })
+      });
+      if (!response.ok) {
+        throw new Error('API error: ' + response.statusText);
+      }
+      const data = await response.json();
+      if (data.choices && data.choices[0]?.message?.content) {
+        return data.choices[0].message.content.trim();
+      }
+      throw new Error('Unexpected API response');
+    }
+
     document.getElementById('generateBtn').onclick = async function() {
       if (!GPT_API_KEY) {
         alert('API key not configured. Please check your environment variables.');
@@ -307,6 +363,39 @@
         summaryDiv.style.display = 'block';
       } finally {
         loadingDiv.style.display = 'none';
+        this.disabled = false;
+      }
+    };
+
+    document.getElementById('generateCodesBtn').onclick = async function() {
+      if (!GPT_API_KEY) {
+        alert('API key not configured. Please check your environment variables.');
+        return;
+      }
+      
+      const notes = document.getElementById('clinicalNotes').value.trim();
+      const codesDiv = document.getElementById('codes');
+      const loadingCodesDiv = document.getElementById('loadingCodes');
+      codesDiv.style.display = 'none';
+      codesDiv.innerHTML = '';
+      
+      if (!notes) {
+        alert('Please paste clinical notes first.');
+        return;
+      }
+      
+      loadingCodesDiv.style.display = 'block';
+      this.disabled = true;
+      
+      try {
+        const codes = await generateCodes(notes);
+        codesDiv.innerHTML = '<h2>CPT & ICD-10 Codes</h2><div style="white-space: pre-line; font-family: monospace; font-size: 0.95rem;">' + codes + '</div>';
+        codesDiv.style.display = 'block';
+      } catch (err) {
+        codesDiv.innerHTML = `<span style="color:#b71c1c;">Error: ${err.message}</span>`;
+        codesDiv.style.display = 'block';
+      } finally {
+        loadingCodesDiv.style.display = 'none';
         this.disabled = false;
       }
     };
