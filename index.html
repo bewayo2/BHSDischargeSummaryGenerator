@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏥</text></svg>">
   <title>Discharge Summary Generator</title>
   <style>
     body {
@@ -116,7 +117,15 @@
     &copy; 2024 Discharge Summary Demo. Powered by OpenAI GPT-4.1 API.
   </div>
   <script type="module">
-    import { GPT_API_KEY } from './gpt_api_key.js';
+    // API key is injected by the server from environment variables
+    const GPT_API_KEY = window.OPENAI_API_KEY;
+    
+    console.log('Debug - window.OPENAI_API_KEY:', window.OPENAI_API_KEY);
+    console.log('Debug - GPT_API_KEY:', GPT_API_KEY);
+    
+    if (!GPT_API_KEY) {
+      console.error('API key not found. Please check your environment variables.');
+    }
 
     // Standard discharge summary headings
     const headings = [
@@ -253,6 +262,11 @@
     }
 
     document.getElementById('generateBtn').onclick = async function() {
+      if (!GPT_API_KEY) {
+        alert('API key not configured. Please check your environment variables.');
+        return;
+      }
+      
       const notes = document.getElementById('clinicalNotes').value.trim();
       const summaryDiv = document.getElementById('summary');
       const loadingDiv = document.getElementById('loading');
