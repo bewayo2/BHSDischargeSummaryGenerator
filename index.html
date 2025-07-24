@@ -148,23 +148,23 @@
     // Standards-aligned prompts for each section
     const sectionPrompts = {
       'Reason for hospitalisation':
-        'Extract and summarize the reason for hospitalisation from the following clinical notes. Only use information present in the text. Do not invent or add information.',
+        'Extract and summarize the reason for hospitalisation from the following clinical notes. Only use information present in the text. Do not invent or add information. Be concise.',
       'Significant findings & final diagnoses':
-        'Extract and summarize the significant findings and final diagnoses from the following clinical notes. Only use information present in the text. Do not invent or add information.',
+        'Extract and summarize the significant findings and final diagnoses from the following clinical notes. Only use information present in the text. Do not invent or add information. Be concise.',
       'Procedures / treatments':
-        'Extract and summarize all procedures and treatments performed during the hospital stay from the following clinical notes. Only use information present in the text. Do not invent or add information.',
+        'Extract and summarize all procedures and treatments performed during the hospital stay from the following clinical notes. Only use information present in the text. Do not invent or add information. Be concise.',
       'Hospital course (brief narrative)':
-        'Extract and summarize the hospital course, including key events and clinical thinking, from the following clinical notes. Only use information present in the text. Do not invent or add information.',
+        'Extract and summarize the hospital course, including key events and clinical thinking, from the following clinical notes. Only use information present in the text. Do not invent or add information. Be concise.',
       'Current condition at discharge':
-        'Extract and summarize the patient\'s current condition at discharge from the following clinical notes. Only use information present in the text. Do not invent or add information.',
+        'Extract and summarize the patient\'s current condition at discharge from the following clinical notes. Only use information present in the text. Do not invent or add information. Be concise.',
       'Medication list with changes explained':
-        'Extract and summarize the medication list at discharge, including any changes and explanations, from the following clinical notes. Only use information present in the text. Do not invent or add information.',
+        'Extract and summarize the medication list at discharge, including any changes and explanations, from the following clinical notes. Only use information present in the text. Do not invent or add information. Be concise.',
       'Follow-up tests/appointments':
-        'Extract and summarize all follow-up tests and appointments, including pending investigations and who will follow up, from the following clinical notes. Only use information present in the text. Do not invent or add information.',
+        'Extract and summarize all follow-up tests and appointments, including pending investigations and who will follow up, from the following clinical notes. Only use information present in the text. Do not invent or add information. Be concise.',
       'Patient & family instructions (plain language)':
-        'Extract and summarize, in plain language, any instructions for the patient and family that are present in the following clinical notes. Only use information present in the text. Do not invent or add information.',
+        'Extract and summarize, in plain language, any instructions for the patient and family that are present in the following clinical notes. Only use information present in the text. Do not invent or add information. Be concise.',
       'Responsible clinician contact + signature':
-        'Extract and summarize the responsible clinician\'s contact information and signature from the following clinical notes. Only use information present in the text. Do not invent or add information.'
+        'Extract and summarize the responsible clinician\'s contact information and signature from the following clinical notes. Only use information present in the text. Do not invent or add information. Be concise.'
     };
 
     const model = 'google/flan-t5-large'; // Instruction-tuned model
@@ -249,7 +249,7 @@
         body: JSON.stringify({
           model: 'gpt-4-1106-preview',
           messages: [
-            { role: 'system', content: 'You are a clinical discharge summary assistant. For each section, extract and summarize only what is present in the provided clinical notes. Never invent or add information. Do not repeat the section heading in your response. Do not use Markdown formatting (no asterisks, no bold, no lists with dashes or asterisks). Use clear, concise, and professional language. Format your response with clear paragraphs and use bullet points for lists such as medications, instructions, and follow-up items. Do not use Markdown.' },
+            { role: 'system', content: 'You are a clinical discharge summary assistant. For each section, extract and summarize only what is present in the provided clinical notes. Never invent or add information. Do not repeat the section heading in your response. Do not use Markdown formatting (no asterisks, no bold, no lists with dashes or asterisks). Use clear, concise, and professional language. Format your response with clear paragraphs and use bullet points for lists such as medications, instructions, and follow-up items. Do not use Markdown. Be as concise as possible. Use short, direct sentences. Omit unnecessary details.' },
             { role: 'user', content: prompt }
           ],
           max_tokens: 512,
